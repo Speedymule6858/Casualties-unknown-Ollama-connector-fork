@@ -174,6 +174,18 @@ namespace CasualtiesOllama
             }
         }
 
+        public string MultiplayerChatObservation(bool markAsRead)
+        {
+            if (!Cfg.ReadChat || !Cfg.Sense.Chat || MpChat.Count == 0) return "";
+            var recent = MpChat.Skip(Math.Max(0, MpChat.Count - Cfg.ChatLines)).ToList();
+            var chat = new StringBuilder();
+            chat.AppendLine("MULTIPLAYER CHAT (* = new; answer players in the 'chat' field; you are called " + Cfg.AiName + "):");
+            foreach (var line in recent)
+                chat.AppendLine((line.New ? "  * " : "    ") + "[" + line.Name + (line.FromLocal ? " (operator)" : "") + "]: " + line.Text + (line.Mention && line.New ? "   <-- talking to YOU" : ""));
+            if (markAsRead) foreach (var line in MpChat) line.New = false;
+            return chat.ToString();
+        }
+
         public void SendChat(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
@@ -398,14 +410,7 @@ namespace CasualtiesOllama
                 pendingAlerts.Clear();
             }
             extra.Append(PointerText(b));
-            if (Cfg.ReadChat && Cfg.Sense.Chat && MpChat.Count > 0)
-            {
-                var recent = MpChat.Skip(Math.Max(0, MpChat.Count - Cfg.ChatLines)).ToList();
-                extra.AppendLine("MULTIPLAYER CHAT (* = new; answer players in the 'chat' field; you are called " + Cfg.AiName + "):");
-                foreach (var l in recent)
-                    extra.AppendLine((l.New ? "  * " : "    ") + "[" + l.Name + (l.FromLocal ? " (operator)" : "") + "]: " + l.Text + (l.Mention && l.New ? "   <-- talking to YOU" : ""));
-                foreach (var l in MpChat) l.New = false;
-            }
+            extra.Append(MultiplayerChatObservation(true));
             if (pendingHuman.Count > 0)
             {
                 extra.AppendLine("MESSAGE FROM HUMAN (reply in the 'say' field):");

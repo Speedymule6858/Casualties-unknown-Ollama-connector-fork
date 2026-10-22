@@ -308,7 +308,11 @@ namespace CasualtiesOllama
                 var pc = PlayerCamera.main;
                 if (pc != null && pc.body != null)
                 {
-                    try { var o = Senser.Build(pc.body, Cfg, new WorldIndex(), null); previewText = o.Compact + o.Map; }
+                    try
+                    {
+                        var o = Senser.Build(pc.body, Cfg, new WorldIndex(), null);
+                        previewText = o.Compact + P.Agent.MultiplayerChatObservation(false) + o.Map;
+                    }
                     catch (Exception ex) { previewText = "Error: " + ex.Message + "\n" + ex.StackTrace; }
                 }
                 else previewText = "(no player in the scene - load a run first)";

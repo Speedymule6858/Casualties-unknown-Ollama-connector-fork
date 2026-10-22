@@ -13,6 +13,7 @@ namespace CasualtiesOllama
         static bool init;
         static Type tNB;
         static FieldInfo fCarrying, fPiggy, fBody;
+        static PropertyInfo pBody;
         static MethodInfo mStart, mStop;
 
         static void Init()
@@ -20,15 +21,25 @@ namespace CasualtiesOllama
             if (init) return;
             try
             {
-                var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "KrokoshaCasualtiesMP");
-                if (asm == null) return;
-                init = true;
-                tNB = asm.GetType("KrokoshaCasualtiesMP.NetBody");
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                var asm = assemblies.FirstOrDefault(a => a.GetName().Name == "CasualtiesMP")
+                    ?? assemblies.FirstOrDefault(a => a.GetName().Name == "KrokoshaCasualtiesMP");
+                tNB = asm != null ? asm.GetType("KrokoshaCasualtiesMP.NetBody") ?? asm.GetType("Together.NetBody") : null;
+                if (tNB == null)
+                {
+                    foreach (var a in assemblies)
+                    {
+                        tNB = a.GetType("Together.NetBody") ?? a.GetType("KrokoshaCasualtiesMP.NetBody");
+                        if (tNB != null) break;
+                    }
+                }
                 if (tNB == null) return;
+                init = true;
                 BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
                 fCarrying = tNB.GetField("carrying_person", all);
                 fPiggy = tNB.GetField("piggybacking_on", all);
                 fBody = tNB.GetField("body", all);
+                pBody = tNB.GetProperty("body", all);
                 mStart = tNB.GetMethod("StartPiggyback", all);
                 mStop = tNB.GetMethod("StopPiggyback", all);
             }
@@ -43,14 +54,27 @@ namespace CasualtiesOllama
             if (tNB == null || b == null) return null;
             object o = b.GetComponent(tNB);
             if (o == null) o = b.GetComponentInParent(tNB);
-            if (o == null && fBody != null)
+            if (o == null && (fBody != null || pBody != null))
             {
-                try { foreach (var x in UnityEngine.Object.FindObjectsOfType(tNB)) if (fBody.GetValue(x) as Body == b) return x; } catch { }
+                try
+                {
+                    foreach (var x in UnityEngine.Object.FindObjectsOfType(tNB))
+                    {
+                        Body candidate = fBody != null ? fBody.GetValue(x) as Body : pBody.GetValue(x, null) as Body;
+                        if (candidate == b) return x;
+                    }
+                }
+                catch { }
             }
             return o;
         }
 
-        static Body BodyOf(object nb) { return (nb != null && fBody != null) ? fBody.GetValue(nb) as Body : null; }
+        static Body BodyOf(object nb)
+        {
+            if (nb == null) return null;
+            if (fBody != null) return fBody.GetValue(nb) as Body;
+            return pBody != null ? pBody.GetValue(nb, null) as Body : null;
+        }
 
         public static string NameOf(Body b)
         {

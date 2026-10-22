@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <GamePath>D:\SteamLibrary\steamapps\common\Casualties Unknown Demo</GamePath>
+    <GamePath>C:\Users\proto\Desktop\backup\Casualties Unknown Demo V1</GamePath>
     <ManagedPath>$(GamePath)\CasualtiesUnknown_Data\Managed</ManagedPath>
     <BepInExCore>$(GamePath)\BepInEx\core</BepInExCore>
   </PropertyGroup>

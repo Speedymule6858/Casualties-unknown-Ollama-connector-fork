@@ -21,7 +21,7 @@ namespace CasualtiesOllama
     }
 
     /// <summary>
-    /// Bridge to the "Casualties Together" multiplayer mod (KrokoshaCasualtiesMP.dll).
+    /// Bridge to the "Casualties Together" multiplayer mod.
     /// Everything is done through reflection, so this mod works with or without the multiplayer mod installed.
     /// </summary>
     public static class MP
@@ -31,10 +31,11 @@ namespace CasualtiesOllama
         static Assembly asm;
         static Type tPlayer, tChat, tMsg;
         static FieldInfo fDict, fLocalPlayer, fName, fChatLog, fcName, fcMsg;
-        static PropertyInfo pLocal;
+        static PropertyInfo pLocal, pName;
         static MethodInfo mSend;
         static readonly HashSet<object> seen = new HashSet<object>();
         static bool firstPoll = true;
+        static bool missingApiLogged;
 
         public static bool Present { get { Init(); return ready; } }
 
@@ -44,17 +45,28 @@ namespace CasualtiesOllama
             nextTry = Time.realtimeSinceStartup + 5f;
             try
             {
-                asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "KrokoshaCasualtiesMP");
-                if (asm == null) return;
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                asm = assemblies.FirstOrDefault(a => a.GetName().Name == "CasualtiesMP")
+                    ?? assemblies.FirstOrDefault(a => a.GetName().Name == "KrokoshaCasualtiesMP");
+                if (asm == null)
+                {
+                    tPlayer = FindType(assemblies, "Together.ScavPlayer") ?? FindType(assemblies, "KrokoshaCasualtiesMP.NetPlayer");
+                    tChat = FindType(assemblies, "Together.Chat") ?? FindType(assemblies, "KrokoshaCasualtiesMP.Chat");
+                    if (tPlayer == null && tChat == null) return;
+                    asm = tPlayer != null ? tPlayer.Assembly : tChat.Assembly;
+                }
                 BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
-                tPlayer = asm.GetType("KrokoshaCasualtiesMP.NetPlayer");
-                tChat = asm.GetType("KrokoshaCasualtiesMP.Chat");
+                tPlayer = asm.GetType("KrokoshaCasualtiesMP.NetPlayer") ?? asm.GetType("Together.ScavPlayer")
+                    ?? FindType(assemblies, "Together.ScavPlayer") ?? FindType(assemblies, "KrokoshaCasualtiesMP.NetPlayer");
+                tChat = asm.GetType("KrokoshaCasualtiesMP.Chat") ?? asm.GetType("Together.Chat")
+                    ?? FindType(assemblies, "Together.Chat") ?? FindType(assemblies, "KrokoshaCasualtiesMP.Chat");
                 if (tPlayer != null)
                 {
                     fDict = tPlayer.GetField("BodyToPlayerDict", all);
-                    fLocalPlayer = tPlayer.GetField("LOCAL_PLAYER", all);
-                    fName = tPlayer.GetField("playername", all);
-                    pLocal = tPlayer.GetProperty("is_local", all);
+                    fLocalPlayer = tPlayer.GetField("LOCAL_PLAYER", all) ?? tPlayer.GetField("LocalPlayer", all);
+                    fName = tPlayer.GetField("playername", all) ?? tPlayer.GetField("playerName", all);
+                    pName = tPlayer.GetProperty("playername", all) ?? tPlayer.GetProperty("playerName", all);
+                    pLocal = tPlayer.GetProperty("is_local", all) ?? tPlayer.GetProperty("IsLocal", all);
                 }
                 if (tChat != null)
                 {
@@ -63,19 +75,38 @@ namespace CasualtiesOllama
                     tMsg = tChat.GetNestedType("ChatMsgContainer", all);
                     if (tMsg != null) { fcName = tMsg.GetField("name", all); fcMsg = tMsg.GetField("msg", all); }
                 }
-                ready = tPlayer != null;
-                if (ready) Plugin.Log?.LogInfo("Multiplayer mod detected (players: " + (fDict != null) + ", chat: " + (fChatLog != null && mSend != null) + ")");
+                ready = tPlayer != null || tChat != null;
+                if (ready) Plugin.Log?.LogInfo("Multiplayer mod detected (players: " + (tPlayer != null && fDict != null) + ", chat: " + (tChat != null && fChatLog != null && mSend != null) + ")");
+                else if (!missingApiLogged)
+                {
+                    missingApiLogged = true;
+                    Plugin.Log?.LogWarning("MP bridge found " + asm.GetName().Name + " but not its player/chat API types. Loaded candidate types: "
+                        + string.Join(", ", assemblies.SelectMany(a => new[] { "Together.ScavPlayer", "Together.Chat", "KrokoshaCasualtiesMP.NetPlayer", "KrokoshaCasualtiesMP.Chat" }
+                            .Where(name => a.GetType(name) != null).Select(name => a.GetName().Name + ":" + name)).Distinct().ToArray()));
+                }
             }
             catch (Exception e) { Plugin.Log?.LogWarning("MP bridge init failed: " + e.Message); }
+        }
+
+        static Type FindType(Assembly[] assemblies, string name)
+        {
+            foreach (Assembly a in assemblies)
+            {
+                Type t = a.GetType(name);
+                if (t != null) return t;
+            }
+            return null;
         }
 
         public static string LocalName()
         {
             try
             {
-                if (!Present || fLocalPlayer == null || fName == null) return "";
+                if (!Present || fLocalPlayer == null || (fName == null && pName == null)) return "";
                 object lp = fLocalPlayer.GetValue(null);
-                return lp != null ? (fName.GetValue(lp) as string ?? "") : "";
+                if (lp == null) return "";
+                if (fName != null) return fName.GetValue(lp) as string ?? "";
+                return pName != null ? pName.GetValue(lp, null) as string ?? "" : "";
             }
             catch { return ""; }
         }
@@ -94,7 +125,12 @@ namespace CasualtiesOllama
                     Body bd = de.Key as Body;
                     if (bd == null) continue;
                     object pl = de.Value;
-                    string nm = (pl != null && fName != null) ? (fName.GetValue(pl) as string) : null;
+                    string nm = null;
+                    if (pl != null)
+                    {
+                        if (fName != null) nm = fName.GetValue(pl) as string;
+                        else if (pName != null) nm = pName.GetValue(pl, null) as string;
+                    }
                     bool loc = false;
                     try { if (pl != null && pLocal != null) loc = (bool)pLocal.GetValue(pl, null); } catch { }
                     list.Add(new PlayerInfo { Body = bd, Name = string.IsNullOrEmpty(nm) ? "player" : nm, IsLocal = loc });
