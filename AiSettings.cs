@@ -26,10 +26,12 @@ namespace CasualtiesOllama
         public bool Wearing = true;
         public bool Craftables = true;    // only recipes that can be crafted right now
         public bool Events = true;
-        public bool DamageLog = true;     // "what hit you"
+        public bool DamageLog = true;     // "what hit me"
         public bool Chat = true;          // multiplayer chat lines
         public bool Pointer = true;       // the spot the human pointed at
         public bool Position = false;
+        public bool Screenshot = false;
+        public float ScreenshotScale = 1.0f;
     }
 
     /// <summary>What the AI may DO. Forbidden actions are rejected and the AI is told.</summary>
@@ -60,155 +62,101 @@ namespace CasualtiesOllama
         // ---- connection ----
         public string ApiKind = "ollama";      // ollama | openai   which API the server speaks
         public string OllamaUrl = "http://localhost:11434";  // Ollama base URL, OR the base URL of an OpenAI-compatible server
-        public string ApiKey = "";             // optional API key (cloud / proxy, never saved in profiles)
-        public string Model = "";
-        public float Temperature = 0.4f;
-        public int NumCtx = 8192;
-        public int NumPredict = 700;
-        public string Think = "default";       // default | off | on
-        public string KeepAlive = "30m";
-        public int TimeoutSec = 180;
+            public string ApiKey = "";             // optional API key (cloud / proxy, never saved in profiles)
+            public string Model = "";
+            public float Temperature = 0.4f;
+            public int NumCtx = 8192;
+            public int NumPredict = 700;
+            public string Think = "default";       // default | off | on
+            public string KeepAlive = "30m";
+            public int TimeoutSec = 180;
 
-        // ---- identity ----
-        public string AiName = "Bot";
-        public string AiAliases = "";          // comma separated extra names it answers to
+            // ---- identity ----
+            public string AiName = "Bot";
+            public string AiAliases = "";          // comma separated extra names it answers to
 
-        // ---- agent behaviour ----
-        public int MaxActionsPerTurn = 4;
-        public float MinThinkInterval = 0.3f;
-        public bool PauseWhileThinking = true;
-        public bool ForceNormalSpeed = true;
-        public bool BlockHumanInput = true;
-        public bool AutoJumpHelper = true;
-        public bool LedgeGuard = true;         // refuse to walk off big drops unless it uses 'leap'
-        public bool InterruptOnChat = true;
-        public bool AutoFollowPointer = true;  // follow the pointer without calling the LLM (saves credits)
-        public bool LogToFile = true;
-        public bool AutoCrouch = true;         // crouch automatically when a 1-block-high tunnel is ahead
-        public bool AutoGrabRope = true;       // grab a rope the moment it is within reach (also while falling past it)
-        public bool KeepShortMemory = true;    // short-term memory + journal are saved to disk and survive restarts / new lives
-        public string MapMode = "compact";     // compact | ascii | both
+            // ---- agent behaviour ----
+            public int MaxActionsPerTurn = 4;
+            public float MinThinkInterval = 0.3f;
+            public bool PauseWhileThinking = true;
+            public bool ForceNormalSpeed = true;
+            public bool BlockHumanInput = true;
+            public bool AutoJumpHelper = true;
+            public bool LedgeGuard = true;         // refuse to walk off big drops unless it uses 'leap'
+            public bool InterruptOnChat = true;
+            public bool AutoFollowPointer = true;  // follow the pointer without calling the LLM (saves credits)
+            public bool LogToFile = true;
+            public bool AutoCrouch = true;        // crouch automatically when a 1-block-high tunnel is ahead
+            public bool AutoGrabRope = true;       // grab a rope the moment it is within reach (also while falling past them)
+            public bool KeepShortMemory = true;    // short-term memory + journal are saved to disk and survive restarts and new lives
+            public string MapMode = "compact";     // compact | ascii | both
 
-        // ---- rate limits (0 = unlimited) ----
-        public int MaxCallsPerMinute = 0;
-        public int MaxCallsPerHour = 0;
-        public int MaxTokensPerHour = 0;
-        public float MinSecondsBetweenCalls = 0f;
-        public bool StopWhenBudgetHit = false;
-        public bool PauseGameWhileRateLimited = false;
+            // ---- rate limits (0 = unlimited) ----
+            public int MaxCallsPerMinute = 0;
+            public int MaxCallsPerHour = 0;
+            public int MaxTokensPerHour = 0;
+            public float MinSecondsBetweenCalls = 0f;
+            public bool StopWhenBudgetHit = false;
+            public bool PauseGameWhileRateLimited = false;
 
-        // ---- memory ----
-        public bool ShortMemory = true;        // recent turns + journal
-        public bool LongMemory = true;         // lessons / post-mortems
-        public int HistoryTurns = 6;
-        public int SummarizeEvery = 6;
-        public int MaxLessonsInPrompt = 15;
-        public string MemoryProfile = "default";
-        public string ActiveProfile = "";
+            // ---- memory ----
+            public bool ShortMemory = true;        // recent turns + journal
+            public bool LongMemory = true;         // lessons / post-mortems
+            public int HistoryTurns = 6;
+            public int SummarizeEvery = 6;
+            public int MaxLessonsInPrompt = 15;
+            public string MemoryProfile = "default";
+            public string ActiveProfile = "";
 
-        // ---- senses tuning ----
-        public int MapHalfWidth = 12;
-        public int MapHalfHeight = 6;
-        public float ItemRadius = 14f;
-        public float CreatureRadius = 18f;
-        public bool ShowItemFlags = false;     // false = the AI must 'inspect' items to learn what they do
+            // ---- senses tuning ----
+            public int MapHalfWidth = 12;
+            public int MapHalfHeight = 6;
+            public float ItemRadius = 14f;
+            public float CreatureRadius = 18f;
+            public bool ShowItemFlags = false;
 
-        // ---- multiplayer ----
-        public bool ReadChat = true;
-        public string ChatMode = "mentions";   // never | mentions | all   (when to react immediately)
-        public bool ReplyInChat = true;
-        public int ChatLines = 8;
-        public float ChatCooldown = 3f;
+            // ---- multiplayer ----
+            public bool ReadChat = true;
+            public string ChatMode = "mentions";   // never | mentions | all   (when to react immediately)
+            public bool ReplyInChat = true;
+            public int ChatLines = 8;
+            public float ChatCooldown = 3f;
 
-        // ---- text ----
-        public string Mission = "Survive as long as possible. Stay alive first (stop bleeding, treat injuries, eat and drink), avoid traps and dangerous creatures, and explore carefully to find useful items.";
-        public string SystemPromptOverride = "";
+            // ---- text ----
+            public string Mission = "Survive as long as possible. Stay alive first (stop bleeding, eat and drink), avoid traps and dangerous creatures, and explore carefully to find useful items.";
+            public string SystemPromptOverride = "";
 
-        // ---- hotkeys ----
-        public string GuiKey = "F8";
-        public string ToggleKey = "F9";
-        public string StopKey = "F10";
-        public string PointerKey = "F7";
+            // ---- hotkeys ----
+            public string GuiKey = "F8";
+            public string ToggleKey = "F9";
+            public string StopKey = "F10";
+            public string PointerKey = "F7";
 
-        /// <summary>True when the server speaks the OpenAI protocol. Tolerant of saved label text like "OpenAI-compatible".</summary>
-        public bool UsesOpenAi => string.Equals(ApiKind, "openai", StringComparison.OrdinalIgnoreCase)
+            public bool UsesOpenAi => string.Equals(ApiKind, "openai", StringComparison.OrdinalIgnoreCase)
             || string.Equals(ApiKind, "openai-compatible", StringComparison.OrdinalIgnoreCase);
 
-        public SenseSettings Sense = new SenseSettings();
-        public PermissionSettings Allow = new PermissionSettings();
+            public SenseSettings Sense = new SenseSettings();
+            public PermissionSettings Allow = new PermissionSettings();
 
-        [JsonIgnore] public string Path;
+            [System.Text.NonSerialized] public string Path;
 
-        public static AiSettings Load(string dir)
-        {
-            string path = System.IO.Path.Combine(dir, "settings.json");
-            AiSettings s = null;
-            try { if (File.Exists(path)) s = JsonConvert.DeserializeObject<AiSettings>(File.ReadAllText(path)); }
-            catch (Exception e) { Plugin.Log?.LogWarning("settings.json unreadable, using defaults: " + e.Message); }
-            if (s == null) s = new AiSettings();
-            if (s.Sense == null) s.Sense = new SenseSettings();
-            if (s.Allow == null) s.Allow = new PermissionSettings();
-            s.Path = path;
-            return s;
-        }
-
-        public void Save()
-        {
-            try { File.WriteAllText(Path, JsonConvert.SerializeObject(this, Formatting.Indented)); }
-            catch (Exception e) { Plugin.Log?.LogWarning("Could not save settings: " + e.Message); }
-        }
-    }
-
-    /// <summary>Named snapshots of all settings (model, mission, senses, permissions, prompt...). API key is never stored.</summary>
-    public static class ProfileStore
-    {
-        static string Dir(string root) { string d = Path.Combine(root, "profiles"); Directory.CreateDirectory(d); return d; }
-        public static string Safe(string n)
-        {
-            if (string.IsNullOrWhiteSpace(n)) return "";
-            foreach (char c in Path.GetInvalidFileNameChars()) n = n.Replace(c, '_');
-            return n.Trim();
-        }
-
-        public static List<string> List(string root)
-        {
-            try { return Directory.GetFiles(Dir(root), "*.json").Select(f => Path.GetFileNameWithoutExtension(f)).OrderBy(x => x).ToList(); }
-            catch { return new List<string>(); }
-        }
-
-        public static bool Save(string root, string name, AiSettings cfg)
-        {
-            name = Safe(name);
-            if (name.Length == 0) return false;
-            try
+            public static AiSettings Load(string dir)
             {
-                JObject jo = JObject.FromObject(cfg);
-                jo.Remove("ApiKey");
-                jo.Remove("ActiveProfile");
-                File.WriteAllText(Path.Combine(Dir(root), name + ".json"), jo.ToString(Formatting.Indented));
-                cfg.ActiveProfile = name;
-                return true;
+                string path = System.IO.Path.Combine(dir, "settings.json");
+                AiSettings s = null;
+                try { if (System.IO.File.Exists(path)) s = Newtonsoft.Json.JsonConvert.DeserializeObject<AiSettings>(System.IO.File.ReadAllText(path)); }
+                catch (Exception e) { Plugin.Log?.LogWarning("settings.json unreadable, using defaults: " + e.Message); }
+                if (s == null) s = new AiSettings();
+                if (s.Sense == null) s.Sense = new SenseSettings();
+                if (s.Allow == null) s.Allow = new PermissionSettings();
+                s.Path = path;
+                return s;
             }
-            catch (Exception e) { Plugin.Log?.LogWarning("Profile save failed: " + e.Message); return false; }
-        }
 
-        public static bool Load(string root, string name, AiSettings cfg)
-        {
-            name = Safe(name);
-            string path = Path.Combine(Dir(root), name + ".json");
-            if (!File.Exists(path)) return false;
-            try
+            public void Save()
             {
-                JsonConvert.PopulateObject(File.ReadAllText(path), cfg);
-                cfg.ActiveProfile = name;
-                return true;
+                try { System.IO.File.WriteAllText(Path, Newtonsoft.Json.JsonConvert.SerializeObject(this, Newtonsoft.Json.Formatting.Indented)); }
+                catch (Exception e) { Plugin.Log?.LogWarning("Could not save settings: " + e.Message); }
             }
-            catch (Exception e) { Plugin.Log?.LogWarning("Profile load failed: " + e.Message); return false; }
-        }
-
-        public static void Delete(string root, string name)
-        {
-            try { string p = Path.Combine(Dir(root), Safe(name) + ".json"); if (File.Exists(p)) File.Delete(p); } catch { }
-        }
     }
 }

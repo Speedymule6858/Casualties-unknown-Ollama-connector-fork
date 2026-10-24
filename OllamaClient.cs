@@ -21,7 +21,6 @@ namespace CasualtiesOllama
         public int PromptTokens, EvalTokens;
     }
 
-    /// <summary>Counts LLM calls and tokens so a cloud budget can be enforced. Thread-safe.</summary>
     public class RateLimiter
     {
         readonly object L = new object();
@@ -52,7 +51,6 @@ namespace CasualtiesOllama
         public int CallsLastHour() { lock (L) { Prune(DateTime.UtcNow); return calls.Count; } }
         public int TokensLastHour() { lock (L) { Prune(DateTime.UtcNow); return tokens.Sum(t => t.Value); } }
 
-        /// <summary>Returns true if a call may be made now. Otherwise wait = seconds to wait, why = reason, hard = budget exhausted.</summary>
         public bool Check(AiSettings c, out float wait, out string why, out bool hard)
         {
             wait = 0f; why = ""; hard = false;
@@ -91,7 +89,6 @@ namespace CasualtiesOllama
         }
     }
 
-    /// <summary>Minimal blocking chat client for BOTH Ollama and OpenAI-compatible APIs. ALWAYS call from a background thread.</summary>
     public static class OllamaClient
     {
         static HttpWebRequest Make(AiSettings cfg, string url, string method, int timeoutSec)
@@ -100,7 +97,6 @@ namespace CasualtiesOllama
             req.Method = method;
             req.Timeout = timeoutSec * 1000;
             req.ReadWriteTimeout = timeoutSec * 1000;
-            // OpenAI-compatible servers (and Ollama proxies) all accept a Bearer token here.
             if (!string.IsNullOrWhiteSpace(cfg.ApiKey)) req.Headers["Authorization"] = "Bearer " + cfg.ApiKey.Trim();
             return req;
         }
@@ -111,7 +107,7 @@ namespace CasualtiesOllama
             {
                 using (var resp = (HttpWebResponse)req.GetResponse())
                 using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    return sr.ReadToEnd();
+                return sr.ReadToEnd();
             }
             catch (WebException ex)
             {
@@ -123,7 +119,6 @@ namespace CasualtiesOllama
 
         static string Base(AiSettings cfg) { return cfg.OllamaUrl.TrimEnd('/'); }
 
-        /// <summary>OpenAI-compatible base URL: ensure it ends with /v1 (unless the user already typed it, e.g. OpenRouter's /api/v1).</summary>
         static string OpenAiBase(AiSettings cfg)
         {
             string b = cfg.OllamaUrl.TrimEnd('/');
@@ -147,7 +142,6 @@ namespace CasualtiesOllama
             return list;
         }
 
-        /// <summary>Model listing for an OpenAI-compatible server: GET /v1/models -> data[].id.</summary>
         static List<string> OpenAiListModels(AiSettings cfg)
         {
             string url = OpenAiBase(cfg) + "/models";
@@ -157,7 +151,7 @@ namespace CasualtiesOllama
             var list = new List<string>();
             var arr = jo["data"] as JArray;
             if (arr != null) foreach (var m in arr) { string n = (string)m["id"]; if (!string.IsNullOrEmpty(n)) list.Add(n); }
-            var admins = jo["results"] as JArray;   // some proxies use 'results' instead of 'data'
+            var admins = jo["results"] as JArray;
             if (admins != null) foreach (var m in admins) { string n = (string)m["id"]; if (!string.IsNullOrEmpty(n)) list.Add(n); }
             list.Sort();
             return list;
@@ -166,51 +160,55 @@ namespace CasualtiesOllama
         public static JObject ActionSchema()
         {
             string[] verbs = { "move", "walk_to", "follow", "jump", "leap", "walljump", "climb", "crouch", "stand", "wait", "aim", "attack",
-                               "use", "apply", "grab", "wear", "drop", "throw", "swap_hands", "swap_slots", "inspect", "craft", "relocate", "pull_shrapnel", "say",
-                               "mount", "interact", "remove", "store", "take", "combine", "piggyback", "carry", "dismount", "drop_carried" };
-            var doEnum = new JArray(); foreach (var v in verbs) doEnum.Add(v);
-            var props = new JObject
-            {
-                ["do"] = new JObject { ["type"] = "string", ["enum"] = doEnum },
-                ["dir"] = new JObject { ["type"] = "string", ["enum"] = new JArray("left", "right", "up", "down", "none") },
-                ["sec"] = new JObject { ["type"] = "number" },
-                ["slot"] = new JObject { ["type"] = "integer" },
-                ["slot2"] = new JObject { ["type"] = "integer" },
-                ["target"] = new JObject { ["type"] = "string" },
-                ["limb"] = new JObject { ["type"] = "string" },
-                ["dx"] = new JObject { ["type"] = "number" },
-                ["dy"] = new JObject { ["type"] = "number" },
-                ["times"] = new JObject { ["type"] = "integer" },
-                ["text"] = new JObject { ["type"] = "string" },
-                ["target2"] = new JObject { ["type"] = "string" },
-                ["exit"] = new JObject { ["type"] = "string", ["enum"] = new JArray("left", "right", "none") }
-            };
-            return new JObject
-            {
-                ["type"] = "object",
-                ["properties"] = new JObject
+                "use", "apply", "grab", "wear", "drop", "throw", "swap_hands", "swap_slots", "inspect", "craft", "relocate", "pull_shrapnel", "say",
+                "mount", "interact", "remove", "store", "take", "combine", "piggyback", "carry", "dismount", "drop_carried" };
+                var doEnum = new JArray(); foreach (var v in verbs) doEnum.Add(v);
+                var props = new JObject
                 {
-                    ["thought"] = new JObject { ["type"] = "string" },
-                    ["actions"] = new JObject { ["type"] = "array", ["items"] = new JObject { ["type"] = "object", ["properties"] = props, ["required"] = new JArray("do") } },
-                    ["say"] = new JObject { ["type"] = "string" },
-                    ["chat"] = new JObject { ["type"] = "string" },
-                    ["lesson"] = new JObject { ["type"] = "string" },
-                    ["note_player"] = new JObject { ["type"] = "string" },
-                    ["note"] = new JObject { ["type"] = "string" }
-                },
-                ["required"] = new JArray("thought", "actions")
-            };
+                    ["do"] = new JObject { ["type"] = "string", ["enum"] = doEnum },
+                    ["dir"] = new JObject { ["type"] = "string", ["enum"] = new JArray("left", "right", "up", "down", "none") },
+                    ["sec"] = new JObject { ["type"] = "number" },
+                    ["slot"] = new JObject { ["type"] = "integer" },
+                    ["slot2"] = new JObject { ["type"]="integer" },
+                    ["target"] = new JObject { ["type"] = "string" },
+                    ["limb"] = new JObject { ["type"] = "string" },
+                    ["dx"] = new JObject { ["type"] = "number" },
+                    ["dy"] = new JObject { ["type"] = "number" },
+                    ["times"] = new JObject { ["type"] = "integer" },
+                    ["text"] = new JObject { ["type"] = "string" },
+                    ["target2"] = new JObject { ["type"] = "string" },
+                    ["exit"] = new JObject { ["type"] = "string", ["enum"] = new JArray("left", "right", "none") }
+                };
+                return new JObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JObject
+                    {
+                        ["thought"] = new JObject { ["type"] = "string" },
+                        ["actions"] = new JObject { ["type"] = "array", ["items"] = new JObject { ["type"] = "object", ["properties"] = props, ["required"] = new JArray("do") } },
+                        ["say"] = new JObject { ["type"] = "string" },
+                        ["chat"] = new JObject { ["type"] = "string" },
+                        ["lesson"] = new JObject { ["type"] = "string" },
+                        ["note_player"] = new JObject { ["type"] = "string" },
+                        ["note"] = new JObject { ["type"] = "string" }
+                    },
+                    ["required"] = new JArray("thought", "actions")
+                };
         }
 
-        public static ChatResult Chat(AiSettings cfg, List<ChatMessage> messages, bool useSchema, JObject customSchema = null, int numPredict = 0)
+        public static ChatResult Chat(AiSettings cfg, List<ChatMessage> messages, bool useSchema, JObject customSchema = null, int numPredict = 0, string screenshotBase64 = null)
         {
+            if (screenshotBase64 != null)
+            {
+                messages[messages.Count - 1]["images"] = new JArray(screenshotBase64);
+            }
+
             bool openai = cfg.UsesOpenAi;
             Plugin.Log?.LogInfo("Chat -> openai=" + openai + " ApiKind=[" + cfg.ApiKind + "] model=[" + cfg.Model + "]");
 
             var msgs = new JArray();
             foreach (var m in messages) msgs.Add(new JObject { ["role"] = m.Role, ["content"] = m.Content });
 
-            // ---- build the request body (Ollama vs OpenAI shapes differ) ----
             JObject body;
             string url;
             if (openai)
@@ -221,10 +219,8 @@ namespace CasualtiesOllama
                     ["messages"] = msgs,
                     ["stream"] = false,
                     ["temperature"] = cfg.Temperature,
-                    // OpenAI calls it max_tokens; Ollama calls it num_predict. 0 means "use the setting".
                     ["max_tokens"] = numPredict > 0 ? numPredict : (cfg.NumPredict > 0 ? cfg.NumPredict : 700)
                 };
-                // Ollama-specific knobs (keep_alive, num_ctx, think, format) are not part of the OpenAI schema.
                 url = OpenAiBase(cfg) + "/chat/completions";
             }
             else
@@ -258,11 +254,9 @@ namespace CasualtiesOllama
             try
             {
                 var jo = JObject.Parse(Read(req));
-                // OpenAI: choices[0].message.content ; Ollama: message.content. Pull the text and
-                // strip any reasoning block. Fallbacks keep it working against token-less servers.
                 string content = openai
-                    ? (string)jo["choices"]?[0]?["message"]?["content"] ?? (string)jo["choices"]?[0]?["text"] ?? ""
-                    : (string)jo["message"]?["content"] ?? "";
+                ? (string)jo["choices"]?[0]?["message"]?["content"] ?? (string)jo["choices"]?[0]?["text"] ?? ""
+                : (string)jo["message"]?["content"] ?? "";
                 if (openai)
                 {
                     res.PromptTokens = (int?)jo["usage"]?["prompt_tokens"] ?? 0;
@@ -273,12 +267,11 @@ namespace CasualtiesOllama
                     res.PromptTokens = (int?)jo["prompt_eval_count"] ?? 0;
                     res.EvalTokens = (int?)jo["eval_count"] ?? 0;
                 }
-                res.Content = Regex.Replace(content, "< think>.*?< /think>", "", RegexOptions.Singleline).Trim();
+                res.Content = Regex.Replace(content, "< think>.*?< /think>", "", Regex.Options.Singleline).Trim();
                 if (res.PromptTokens + res.EvalTokens == 0) res.PromptTokens = (payload.Length + content.Length) / 4;
             }
             finally
             {
-                // count the call even when it failed: cloud services usually bill attempts too
                 Plugin.Instance?.Limiter?.Record(res.PromptTokens + res.EvalTokens);
             }
             return res;
